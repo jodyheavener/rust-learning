@@ -556,3 +556,114 @@ for num 0..=50 {
     // Do something with num
 }
 ```
+
+## Moving and Assigning Values
+
+### Ownership
+
+Ownership is what makes safety guarantees possible. It makes informative compiler messages possible.
+
+There are three rules to ownership:
+
+1. Each value has an owner. There is no value in memory that doesn't have a variable that owns it.
+2. There is only one owner. No variables may share ownership. Other variables may borrow the value, but there is only one owner.
+3. Values are dropped as soon as the owner goes out of scope.
+
+Ownership in action:
+
+```rust
+// Create a string
+let s1 = String::from("abc");
+// Assign it as the value of s2
+// The value of s1 is not copied; it is moved
+let s2 = s1;
+
+// Trying to use s1 after it has been moved would result in an error
+// "value borrowed here after move"
+println!("{}", s1);
+```
+
+In the above example, if `s1` was mutable we could assign it a new value. But since it is not it is garbage.
+
+If we wanted to instead make a copy of the value we could use the `clone` method:
+
+```rust
+let s1 = String::from("abc");
+let s2 = s1.clone();
+println!("{} equals {}", s1, s2);
+```
+
+Movement occurs with functions as well, when you pass variables as arguments:
+
+```rust
+let s1 = String::from("abc");
+// s1 is moved to the function
+do_stuff(s1);
+println!("{}", s1); // Error!
+
+fn do_stuff(s: String) {
+  // Do something
+}
+```
+
+To solve this we could move it back when we're done:
+
+```rust
+let mut s1 = String::from("abc");
+// s1 is given to the function, and a string is returned
+s1 = do_stuff(s1);
+println!("{}", s1); // Works
+
+fn do_stuff(s: String) -> String {
+  // Return s as a tail expression
+  s
+}
+```
+
+But this is kind of gross. Passing a value to the function usually means the function is going to consume it and there is no guarantee it will come back the same. For most cases you should use references.
+
+### References & Borrowing
+
+References allow you to pass a value to a function while the initial variable retains ownership. Both the argument type annotation and the function call argument must be prefixed with an `&`:
+
+```rust
+let s1 = String::from("abc");
+// s1 is passed as a reference
+do_stuff(&s1);
+println!("{}", s1); // Works
+
+// This function only borrows the value
+fn do_stuff(s: &String) {
+  // Do something
+}
+```
+
+References must always be valid. Rust won't let you create a reference that outlives the data that it is referencing.
+
+References default to immutable, but can be made mutable:
+
+```rust
+let s1 = String::from("abc");
+// Note the added space before s1
+do_stuff(&mut s1);
+
+fn do_stuff(s: &mut String) {
+  // Do something
+}
+```
+
+If you want to read from or write to the value of the reference function argument you may need to de-reference it:
+
+```rust
+fn do_stuff(s: &mut String) {
+  // De-referencing is happening automatically
+  s.insert_str(0, "Hi, ");
+  // Manually, it would look like
+  (*s).insert_str(0, "Hi, ");
+
+  // And in cases where you need to do it yourself
+  *s = String::from("Replacement");
+}
+```
+
+The compiler will help you here by providing detailed compilation error messages.
