@@ -602,7 +602,7 @@ do_stuff(s1);
 println!("{}", s1); // Error!
 
 fn do_stuff(s: String) {
-  // Do something
+    // Do something
 }
 ```
 
@@ -615,8 +615,8 @@ s1 = do_stuff(s1);
 println!("{}", s1); // Works
 
 fn do_stuff(s: String) -> String {
-  // Return s as a tail expression
-  s
+    // Return s as a tail expression
+    s
 }
 ```
 
@@ -634,7 +634,7 @@ println!("{}", s1); // Works
 
 // This function only borrows the value
 fn do_stuff(s: &String) {
-  // Do something
+    // Do something
 }
 ```
 
@@ -648,7 +648,7 @@ let s1 = String::from("abc");
 do_stuff(&mut s1);
 
 fn do_stuff(s: &mut String) {
-  // Do something
+    // Do something
 }
 ```
 
@@ -656,14 +656,367 @@ If you want to read from or write to the value of the reference function argumen
 
 ```rust
 fn do_stuff(s: &mut String) {
-  // De-referencing is happening automatically
-  s.insert_str(0, "Hi, ");
-  // Manually, it would look like
-  (*s).insert_str(0, "Hi, ");
+    // De-referencing is happening automatically
+    s.insert_str(0, "Hi, ");
+    // Manually, it would look like
+    (*s).insert_str(0, "Hi, ");
 
-  // And in cases where you need to do it yourself
-  *s = String::from("Replacement");
+    // And in cases where you need to do it yourself
+    *s = String::from("Replacement");
 }
 ```
 
 The compiler will help you here by providing detailed compilation error messages.
+
+## Value Groups
+
+### Structs
+
+In other languages you have classes, in Rust you have structs. Structs can have data fields, methods, and associated functions. The syntax for the struct and its fields is the keyword `struct`, then the name of the struct in camel case, then curly braces, and then the fields and their type annotations in a list separated by commons. As a nice touch you can use a comma on the last item in a struct and the compiler won't yell at you:
+
+```rust
+struct RedFox {
+    enemy: bool,
+    life: u8,
+}
+```
+
+Instatiating a struct, while verbose, is straightforward. You need to specify a value for every field:
+
+```rust
+let fox = RedFox {
+    enemy: true,
+    life: 70,
+}
+```
+
+Typically you would create an associated function as a constructor to create a struct with default values, and then call that:
+
+```rust
+// Implementation block for a struct
+impl RedFox {
+    // Associated function ()
+    fn new() -> Self {
+        Self {
+            enemy: true,
+            life: 70,
+        }
+    }
+}
+```
+
+In the above there is an implementation block that is named after the struct whose functions and methods you are going to implements.
+
+Inside it there as an associated function, because it doesn't have a form of `self` as its first parameter. In other languages this would be considered a class method. Associated functions are often used as constructors, with `new` being the conventional name you would use when you want to create a new struct with default values.
+
+Inside the implementation block you can use `Self` in place of the struct name. You could also use the struct name, but `Self` is better.
+
+Now let's set up a new struct instance:
+
+```rust
+let fox = RedFox::new();
+```
+
+In the above, the scope operator is double colons (`::`), which is used to access parts of namespace-like things (think back to module `use` statements). Here we're using it access an associated function of the struct.
+
+Once instantiated you can get and set fields and call methods with dot syntax.
+
+Methods are also defined in the implementation block. Methods always take some form of `self` as heir first argument:
+
+```rust
+impl RedFox {
+    // associated function
+    fn function() ...
+
+    // methods
+    fn move(self) ...
+    fn borrow(&self) ...
+    fn mut_borrow(&mut self) ...
+}
+```
+
+### Traits
+
+Where most languages would call "class inheritance", Rust calls "struct inheritance". But this does not exist in Rust. Why? They chose a better way to solve the problem we wish other languages solved in class inheritance, using Traits.
+
+Traits are similar to interfaces in other languages. Rust takes the composition over inheritance approach.
+
+```rust
+// Our struct from above
+struct RedFox {
+    enemy: bool,
+    life: u8,
+}
+
+trait Noisy {
+    fn get_noise(&self) -> &str;
+}
+```
+
+Traits define required behavior; functions and methods that a struct must implement if it wants to have that trait. In the above, the `Noisy` trait specifies that the struct must have a method `get_noise` that returns a borrowed string slice if it wants to be Noisy. Here's how you would implement this:
+
+```rust
+// Implement trait for struct
+impl Noisy for RedFox {
+    // Implement the method that returns the borrowed string
+    fn get_noise(&self) -> &str { "Woof" }
+}
+```
+
+Why didn't we just implement the method directly on the struct's main implementation? Because once we have a trait involved we can start writing generic functions that accept any value that implements the trait:
+
+```rust
+// This function takes an item of type T, which can
+// be anything that implements the Noisy trait
+fn print_noise<T: Noisy>(item: T) {
+    // Now the function can use any behavior on item that
+    // the Noisy trait defines
+    println!("{}", item.get_noise());
+}
+```
+
+As long as one of either the trait or the struct is defined in your project you can implement any trait for any struct:
+
+```rust
+fn print_noise<T: Noisy>(item: T) {
+    println!("{}", item.get_noise());
+}
+
+// Implement Noisy on built-in u8 unsigned integer
+impl Noisy for u8 {
+    fn get_noise(&self) -> &str { "BYTE" }
+}
+
+fn main() {
+    // This is an integer with the type as a suffix to the literal
+    // And because it now implements Noisy we can use it as value
+    // for the print_noise generic function
+    print_noise(5_u8);
+}
+```
+
+There is a special trait called `Copy`. If your values implements this then it will be copied instead of moved in move situations; this is useful for small values that fit entirely on the stack. If the type uses the heap at all then it cannot implement this trait.
+
+While structs do not implement inheritance, traits _do_ implement inheritance. A trait can inherit from another trait, so inheritance hierarchy is possible. Making your trait inherit from the parent trait really just means that anyone who implements the trait must also implement the parent traits as well.
+
+Traits can also have default behaviors, so if you design structs and traits carefully enough you might not have to implement some of the methods at all. To implement default trait behavior, inside of a trait definition instead of ending your function or method definition with a semi-colon add a block with your default behavior. Then when you implement the trait for your struct just don't provide a new definition for the method whose default implementation you want to use:
+
+```rust
+trait Run {
+    // Trait with default implementation block
+    fn run(&self) {
+        println!("I'm running!");
+    }
+}
+
+// Empty Robot struct
+struct Robot {}
+// Implementing the Run trait for the Robot struct, but not
+// re-implementing `run` to allow it to use the default
+impl Run for Robot {}
+
+fn main( {
+    let robot = Robot {};
+    robot.run();
+})
+```
+
+Traits cannot currently define fields. This may change down the road. The workaround for now is to define setter and getter methods in your traits.
+
+### Collections
+
+All available in the standard library.
+
+#### Vec<T>
+
+A vector is a generic collection that holds a bunch of one type, and is useful where you would use lists or arrays in other languages. It's the most commonly used collection.
+
+When you create a vector you specify the one type of object it will store. Once you set it up you can push to and pop it. Since vectors store objects of known size into memory, you can index into it as well.
+
+```rust
+let mut v: Vec<i32> = Vec::new();
+v.push(2);
+v.push(4);
+v.push(6);
+let x = v.pop(); // x is 6
+println("{}", v[1]); // prints "4"
+```
+
+There is a macro that makes creating vectors from literal values much more ergonomic:
+
+```rust
+let mut v = vec![2, 4, 6];
+```
+
+Vectors have a lot of [methods](https://doc.rust-lang.org/std/vec/struct.Vec.html).
+
+#### HashMap<K, V>
+
+HashMaps are a generic collection where you specify the key and the value types. In some languages this would be called a dictionary. The main purpose is to be able to look up an item by key.
+
+In a HashMap you specify the type of the key and the type of the value. Once you have a HashMap you can insert, remove, and many [other things](https://doc.rust-lang.org/std/collections/struct.HashMap.html).
+
+```rust
+let mut h: HashMap<u8, bool> = HashMap::new();
+h.insert(5, true);
+h.insert(6, false);
+let have_five = h.remove(&5).unwrap();
+```
+
+#### Other important collections...
+
+- VecDeque uses a ring buffer to implement a double-ended queue which can efficiently add items from the front or back, but is not great for other operations.
+- LinkedList can quickly add or remove items at an arbitrary point in a list.
+- HashSet is a hashing implementation of a Set that performs Set operations really efficiently.
+- BinaryHeap is like a priority queue which always pops off the max value.
+- BTreeMap and BTreeSet are alternate map and set implementations using a modified binary tree. You usually only choose these over the has variants if you need the map keys or set values to always be sorted.
+
+### Enum
+
+Enums in Rust are more like Algebraic Data Types than C-like enums. Specify an enum with the keyword `enum`, the name of it in camel-case, and the items comma-separated in a block:
+
+```rust
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+let color = Color::Red;
+```
+
+The real power of enums in Rust comes from associating data and methods with the variants:
+
+```rust
+enum DispenserItem {
+    // Named variant with no data
+    Empty,
+    // A single type of data
+    Ammo(u8),
+    // A tuple of data
+    Things(String, i32),
+    // An anonymous struct of data
+    Place {x: i32, y: i32},
+}
+```
+
+You can implement functions and methods for enums:
+
+```rust
+impl DispenserItem {
+    fn display(&self) { }
+}
+```
+
+You can also use generics. `Option` is a generic enum in the standard library that uou will use all the time. It represents when something either absent or present; if you're trying to reach for null or nil values you'll probably want to use Option in Rust.
+
+```rust
+enum Options<T> {
+    Some<T>,
+    None,
+}
+```
+
+Because enums can represent all sorts of data you need to use patterns to examine them. If you want to check for a single variant you use the `if let` expression.
+
+```rust
+// if-let takes a pattern that will match one of the variants
+// If the pattern does match then the condition is true and the
+// variables inside the pattern are created for the scope of
+// the if-let block.
+if let Some(x) = my_variable {
+    println!("value is {}", x);
+}
+```
+
+This is great if you only care about one variant matching or not, but not as great if you care about all the variants at once. Int hat case you'll use the `match` expression:
+
+```rust
+match my_variable {
+    Some(x) => {
+        println!("value is {}", x);
+    },
+    None => {
+        println!("no value");
+    }
+}
+```
+
+Match expressions require you to write a branch for every possible outcome (exhaustive), but `_` can be used as a default/anything else branch.
+
+Note that while you will often see blocks used as a branch arm, any expression will do, including things like function calls and care values:
+
+```rust
+match my_variable {
+    Some(x) => x.squared() + 1,
+    None => 42,
+}
+```
+
+All branch arms need to return nothing or they must return the same type.
+
+Two important enums are [Option](https://doc.rust-lang.org/std/option/enum.Option.html) and [Result](https://doc.rust-lang.org/std/result/enum.Result.html).
+
+## Final Bits...
+
+### Closures
+
+You'll encounter closures when you want to spawn a thread, or when you want to do some functional programming with iterators, and some other places in the standard library.
+
+A closure is an anonymous function that can borrow or capture some data from the function it is nested in. The syntax is a parameter list between two pipes without type annotations followed by a block. This creates an anonymous function you can call later. The types of the arguments and the return value are inferred by how you use them and what you return.
+
+```rust
+let add = |x, y| { x + y };
+
+add(1, 2); // => 3
+```
+
+You don't have to have parameters, you could leave the list empty (`|| => { ... }`). Closures will borrow a reference to values in the enclosing scope:
+
+```rust
+// Create s
+let s = "hi".to_string();
+// Create a closure that borrows a reference to s
+let f = || {
+    println!("{}", s);
+}
+
+f(); // prints "hi"
+```
+
+Closures are very handy for vectors. Just call `iter` and a bunch of methods that use closures will be available to you:
+
+```rust
+let mut v = vec![2, 4, 6];
+
+v.iter()
+    // multiply values by 3
+    .map(|x| x * 3)
+    // filter out any values less than 10
+    .filter(|x| *x > 10)
+    // sum the values together
+    .fold(0, |acc, x| acc + x);
+```
+
+### Threads
+
+Threads are fully cross-platform supported.
+
+Basic example:
+
+```rust
+use std::thread;
+
+fn main() {
+    let handle = thread::spawn(move || {
+        // do stuff in a child thread
+    });
+
+    // do stuff simultaneously in the main thread
+
+    // wait until thread has exited
+    handle.join().unwrap();
+}
+```
+
+Also check out [async-await](https://blog.rust-lang.org/2019/11/07/Async-await-stable.html) which is a much more efficient way to wait for things.
